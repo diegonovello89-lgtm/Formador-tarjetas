@@ -59,6 +59,12 @@ input[type=file]{display:none}
 kbd{font:12px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--bg)}
 .status{display:inline-block;font-size:12px;border-radius:99px;padding:1px 8px;margin-bottom:10px}
 .status.keep{background:var(--keep-bg);color:var(--keep)}.status.drop{background:var(--drop-bg);color:var(--drop)}.status.new{background:var(--bg);color:var(--mute)}
+/* edición */
+.edit label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+.edit label:first-of-type{margin-top:0}
+.edit textarea{min-height:70px;font:17px/1.45 var(--serif);background:var(--panel)}
+.edit textarea.sm{min-height:56px;font-size:15px}
+.edit .row{justify-content:flex-end}
 /* lista */
 .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .filters button{border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
@@ -124,6 +130,13 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   <div id="revBox" class="hide">
     <div class="bar"><i id="barFill"></i></div>
     <div class="meta"><span id="metaPos"></span><span id="metaCount"></span></div>
+    <div class="panel edit hide" id="editBox">
+      <label for="eQ">Pregunta</label><textarea id="eQ"></textarea>
+      <label for="eA">Respuesta</label><textarea id="eA"></textarea>
+      <label for="eC">Complemento (opcional)</label><textarea id="eC" class="sm"></textarea>
+      <div class="row"><button class="b" id="btnEditCancel">Cancelar</button><button class="b pri" id="btnEditSave">Guardar cambios</button></div>
+      <p class="hint" style="margin:10px 0 0;text-align:right"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> guardar · <kbd>Esc</kbd> cancelar</p>
+    </div>
     <div class="card" id="card" tabindex="0" aria-live="polite">
       <span class="status new" id="cardStatus"></span>
       <div class="q" id="cQ"></div>
@@ -133,16 +146,17 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       </div>
       <div class="tap" id="cTap">Toca la tarjeta o pulsa Espacio para ver la respuesta</div>
     </div>
-    <div class="actions">
+    <div class="actions" id="actions">
       <button class="b drop" id="btnDrop">✕ No la quiero</button>
       <button class="b keep" id="btnKeep">✓ Me la quedo</button>
     </div>
-    <div class="sub">
+    <div class="sub" id="sub">
       <button class="b" id="btnPrev">← Anterior</button>
+      <button class="b" id="btnEdit">✎ Editar</button>
       <button class="b" id="btnSkip">Saltar →</button>
     </div>
     <p class="hint" style="margin-top:14px;text-align:center">
-      <kbd>Espacio</kbd> mostrar · <kbd>→</kbd>/<kbd>K</kbd> me la quedo · <kbd>←</kbd>/<kbd>D</kbd> no la quiero · <kbd>S</kbd> saltar · <kbd>Z</kbd> anterior
+      <kbd>Espacio</kbd> mostrar · <kbd>→</kbd>/<kbd>K</kbd> me la quedo · <kbd>←</kbd>/<kbd>D</kbd> no la quiero · <kbd>E</kbd> editar · <kbd>S</kbd> saltar · <kbd>Z</kbd> anterior
     </p>
   </div>
   <div id="revDone" class="panel empty hide">
@@ -280,6 +294,7 @@ function renderReview(){
     $('barFill').style.width=done?'100%':'0';return;
   }
   var card=S.cards[S.idx],c2=counts();
+  setEditing(false);
   shown=false;
   $('cQ').textContent=card.q;
   $('cA').textContent=card.a;
@@ -306,6 +321,33 @@ function mark(s){
 }
 function skip(){if(S.idx<S.cards.length){S.idx++;save();refresh()}}
 function prev(){if(S.idx>0){S.idx--;save();refresh()}}
+function setEditing(on){
+  S.editing=on;
+  ['card','actions','sub'].forEach(function(id){$(id).classList.toggle('hide',on)});
+  $('editBox').classList.toggle('hide',!on);
+}
+function startEdit(){
+  if(S.idx>=S.cards.length)return;
+  var c=S.cards[S.idx];
+  $('eQ').value=c.q;$('eA').value=c.a;$('eC').value=c.c;
+  setEditing(true);
+  $('eQ').focus();
+}
+function saveEdit(){
+  var q=$('eQ').value.trim(),a=$('eA').value.trim();
+  if(!q||!a){alert('La pregunta y la respuesta no pueden estar vacías.');return}
+  var c=S.cards[S.idx];
+  c.q=q;c.a=a;c.c=$('eC').value.trim();
+  save();renderReview();reveal();refresh();
+}
+function cancelEdit(){setEditing(false)}
+$('btnEdit').onclick=startEdit;
+$('btnEditSave').onclick=saveEdit;
+$('btnEditCancel').onclick=cancelEdit;
+$('editBox').addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();saveEdit()}
+  else if(e.key==='Escape'){e.preventDefault();cancelEdit()}
+});
 $('card').onclick=reveal;
 $('btnKeep').onclick=function(){mark('keep')};
 $('btnDrop').onclick=function(){mark('drop')};
@@ -314,11 +356,12 @@ $('btnPrev').onclick=prev;
 $('btnRestart').onclick=function(){S.idx=0;save();refresh()};
 $('btnGoExport').onclick=function(){tab('export')};
 document.addEventListener('keydown',function(e){
-  if(S.tab!=='review'||e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.ctrlKey||e.metaKey)return;
+  if(S.tab!=='review'||S.editing||e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.ctrlKey||e.metaKey)return;
   var k=e.key.toLowerCase();
   if(k===' '){e.preventDefault();reveal()}
   else if(k==='arrowright'||k==='k')mark('keep');
   else if(k==='arrowleft'||k==='d')mark('drop');
+  else if(k==='e'&&!S.editing){e.preventDefault();startEdit()}
   else if(k==='s')skip();
   else if(k==='z')prev();
 });
@@ -345,6 +388,9 @@ function renderList(){
     });
     var go=document.createElement('button');go.textContent='👁';go.title='Ver en revisión';go.setAttribute('aria-label','Ver en revisión');
     go.onclick=function(){S.idx=o.i;save();tab('review')};
+    var ed=document.createElement('button');ed.textContent='✎';ed.title='Editar';ed.setAttribute('aria-label','Editar');
+    ed.onclick=function(){S.idx=o.i;save();tab('review');startEdit()};
+    sw.appendChild(ed);
     sw.appendChild(go);
     d.appendChild(t);d.appendChild(sw);box.appendChild(d);
   });
