@@ -65,6 +65,16 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--line);border-radius:
 .edit textarea{min-height:70px;font:17px/1.45 var(--serif);background:var(--panel)}
 .edit textarea.sm{min-height:56px;font-size:15px}
 .edit .row{justify-content:flex-end}
+/* etiquetas */
+.tagrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 4px 2px 10px;font-size:13px}
+.chip button{border:0;background:none;color:var(--mute);cursor:pointer;font-size:14px;padding:0 4px;line-height:1}
+.chip.ro{padding:2px 10px;color:var(--mute);font-size:12px}
+.tagin{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;min-width:150px;flex:1;max-width:240px}
+input.tagin.sq{border-radius:6px;max-width:none;width:100%;font-size:15px}
+select.tagin{flex:none}
+.listtools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+.listtools .tagin{max-width:200px}
 /* lista */
 .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .filters button{border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
@@ -120,6 +130,9 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     <div class="row">
       <label class="opt" style="margin:0"><input type="checkbox" id="optAppend"> Añadir a las tarjetas actuales (en vez de reemplazarlas)</label>
     </div>
+    <div class="row">
+      <label class="opt" style="margin:0"><input type="checkbox" id="optTagsCol"> La 4.ª columna contiene etiquetas (separadas por espacio)</label>
+    </div>
     <div class="msg" id="loadMsg"></div>
   </div>
 </section>
@@ -134,6 +147,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       <label for="eQ">Pregunta</label><textarea id="eQ"></textarea>
       <label for="eA">Respuesta</label><textarea id="eA"></textarea>
       <label for="eC">Complemento (opcional)</label><textarea id="eC" class="sm"></textarea>
+      <label for="eT">Etiquetas (separadas por espacio)</label><input type="text" id="eT" class="tagin sq" list="tagList" autocomplete="off">
       <div class="row"><button class="b" id="btnEditCancel">Cancelar</button><button class="b pri" id="btnEditSave">Guardar cambios</button></div>
       <p class="hint" style="margin:10px 0 0;text-align:right"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> guardar · <kbd>Esc</kbd> cancelar</p>
     </div>
@@ -145,6 +159,10 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
         <div class="c hide" id="cC"></div>
       </div>
       <div class="tap" id="cTap">Toca la tarjeta o pulsa Espacio para ver la respuesta</div>
+    </div>
+    <div class="tagrow" id="tagrow">
+      <span id="tagChips" class="tagrow" style="margin:0"></span>
+      <input type="text" class="tagin" id="tagAdd" list="tagList" placeholder="+ etiqueta" autocomplete="off" aria-label="Añadir etiqueta">
     </div>
     <div class="actions" id="actions">
       <button class="b drop" id="btnDrop">✕ No la quiero</button>
@@ -178,6 +196,12 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       <button data-f="keep" aria-pressed="false">Me las quedo</button>
       <button data-f="drop" aria-pressed="false">Descartadas</button>
     </div>
+    <div class="listtools">
+      <select class="tagin" id="tagFilter" aria-label="Filtrar por etiqueta"></select>
+      <input type="text" class="tagin" id="bulkTag" list="tagList" placeholder="Etiquetar las visibles…" autocomplete="off">
+      <button class="b" id="btnBulk">Aplicar</button>
+    </div>
+    <div class="msg" id="bulkMsg" style="margin:0 0 10px"></div>
     <div id="listBox"></div>
   </div>
 </section>
@@ -194,18 +218,20 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     <div class="opt"><label><input type="checkbox" id="optComp" checked> Incluir complemento (3.ª columna)</label></div>
     <div class="opt"><label><input type="checkbox" id="optMerge"> Unir complemento dentro de la respuesta</label></div>
     <div class="opt"><label><input type="checkbox" id="optHeader" checked> Incluir encabezados de Anki (<code>#separator:tab</code>, <code>#html:true</code>)</label></div>
-    <div class="opt">Etiqueta: <input type="text" id="optTag" placeholder="opcional, ej. cardiologia"></div>
+    <div class="opt">Etiquetas para todas: <input type="text" id="optTag" class="tagin" list="tagList" placeholder="opcional, ej. cardiologia" autocomplete="off"></div>
+    <p class="hint" style="margin:0 0 6px">Se suman a las etiquetas propias de cada tarjeta.</p>
     <div class="row">
       <button class="b pri" id="btnDownload">Descargar .tsv</button>
       <button class="b" id="btnCopy">Copiar al portapapeles</button>
     </div>
     <div class="msg" id="expMsg"></div>
     <pre id="preview"></pre>
-    <p class="hint" style="margin-top:12px">En Anki: Archivo → Importar → elige el .tsv. Asigna columna 1 a Anverso, 2 a Reverso y 3 a un campo extra (o a Reverso si usas «Unir»).</p>
+    <p class="hint" style="margin-top:12px">En Anki: Archivo → Importar → elige el .tsv. Asigna columna 1 a Anverso, 2 a Reverso y 3 a un campo extra (o a Reverso si usas «Unir»). Las etiquetas van en la última columna y Anki las reconoce con el encabezado.</p>
   </div>
 </section>
 </div>
 
+<datalist id="tagList"></datalist>
 <script>
 (function(){
 'use strict';
@@ -218,7 +244,7 @@ var shown=false;
 function save(){try{localStorage.setItem(KEY,JSON.stringify({cards:S.cards,idx:S.idx}))}catch(e){}}
 function restore(){
   try{var d=JSON.parse(localStorage.getItem(KEY)||'null');
-    if(d&&Array.isArray(d.cards)){S.cards=d.cards;S.idx=Math.min(d.idx||0,Math.max(0,d.cards.length-1))}}catch(e){}
+    if(d&&Array.isArray(d.cards)){S.cards=d.cards.map(function(c){c.t=c.t||[];return c});S.idx=Math.min(d.idx||0,Math.max(0,d.cards.length-1))}}catch(e){}
 }
 
 /* ---------- parseo ---------- */
@@ -234,7 +260,8 @@ function parse(text){
     if(!line.trim()||line.charAt(0)==='#')return;
     var p=line.split('\t').map(unq);
     if(p.length<2||!p[0]||!p[1]){skipped++;return}
-    out.push({q:fromHtmlBreaks(p[0]),a:fromHtmlBreaks(p[1]),c:fromHtmlBreaks(p.slice(2).join(' ').trim()),s:'new'});
+    var tc=$('optTagsCol').checked&&p.length>=4;
+    out.push({q:fromHtmlBreaks(p[0]),a:fromHtmlBreaks(p[1]),c:fromHtmlBreaks((tc?p[2]:p.slice(2).join(' ')).trim()),s:'new',t:tc?normTags(p[3]):[]});
   });
   return {cards:out,skipped:skipped};
 }
@@ -273,7 +300,30 @@ function counts(){
   var c={new:0,keep:0,drop:0};
   S.cards.forEach(function(x){c[x.s]++});return c;
 }
+function normTags(v){
+  var seen={},out=[];
+  String(v||'').split(/[\s,;]+/).forEach(function(t){
+    t=t.replace(/^#/,'').trim();
+    if(t&&!seen[t.toLowerCase()]){seen[t.toLowerCase()]=1;out.push(t)}
+  });
+  return out;
+}
+function allTags(){
+  var m={};S.cards.forEach(function(c){(c.t||[]).forEach(function(t){m[t]=1})});
+  return Object.keys(m).sort(function(a,b){return a.localeCompare(b)});
+}
+function refreshTagLists(){
+  var tags=allTags(),dl=$('tagList'),sel=$('tagFilter');
+  dl.textContent='';
+  tags.forEach(function(t){var o=document.createElement('option');o.value=t;dl.appendChild(o)});
+  sel.textContent='';
+  var o0=document.createElement('option');o0.value='';o0.textContent='Todas las etiquetas';sel.appendChild(o0);
+  tags.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o)});
+  if(S.tagFilter&&tags.indexOf(S.tagFilter)<0)S.tagFilter='';
+  sel.value=S.tagFilter||'';
+}
 function refresh(){
+  refreshTagLists();
   var c=counts();
   $('nRev').textContent=S.cards.length?'('+c.new+')':'';
   $('nKeep').textContent=c.keep?'('+c.keep+')':'';
@@ -306,6 +356,7 @@ function renderReview(){
   st.className='status '+card.s;
   st.textContent=card.s==='keep'?'Te la quedas':card.s==='drop'?'Descartada':'Sin clasificar';
   $('card').className='card'+(card.s==='new'?'':' '+card.s);
+  renderTagRow();
   $('metaPos').textContent='Tarjeta '+(S.idx+1)+' de '+n;
   $('metaCount').textContent='✓ '+c2.keep+'   ✕ '+c2.drop+'   · '+c2.new+' pendientes';
   $('barFill').style.width=((c2.keep+c2.drop)/n*100)+'%';
@@ -321,15 +372,37 @@ function mark(s){
 }
 function skip(){if(S.idx<S.cards.length){S.idx++;save();refresh()}}
 function prev(){if(S.idx>0){S.idx--;save();refresh()}}
+function renderTagRow(){
+  var box=$('tagChips');box.textContent='';
+  if(S.idx>=S.cards.length)return;
+  var card=S.cards[S.idx];
+  (card.t||[]).forEach(function(t){
+    var ch=document.createElement('span');ch.className='chip';
+    ch.appendChild(document.createTextNode(t));
+    var x=document.createElement('button');x.textContent='×';x.title='Quitar etiqueta';x.setAttribute('aria-label','Quitar etiqueta '+t);
+    x.onclick=function(){card.t=card.t.filter(function(y){return y!==t});save();renderTagRow();refreshTagLists()};
+    ch.appendChild(x);box.appendChild(ch);
+  });
+}
+function addTagToCurrent(){
+  var inp=$('tagAdd'),add=normTags(inp.value);
+  if(!add.length||S.idx>=S.cards.length)return;
+  var c=S.cards[S.idx];c.t=normTags((c.t||[]).concat(add).join(' '));
+  inp.value='';save();renderTagRow();refreshTagLists();
+}
+$('tagAdd').addEventListener('keydown',function(e){
+  if(e.key==='Enter'||e.key===','||e.key===' '){e.preventDefault();addTagToCurrent()}
+});
+$('tagAdd').addEventListener('change',addTagToCurrent);
 function setEditing(on){
   S.editing=on;
-  ['card','actions','sub'].forEach(function(id){$(id).classList.toggle('hide',on)});
+  ['card','actions','sub','tagrow'].forEach(function(id){$(id).classList.toggle('hide',on)});
   $('editBox').classList.toggle('hide',!on);
 }
 function startEdit(){
   if(S.idx>=S.cards.length)return;
   var c=S.cards[S.idx];
-  $('eQ').value=c.q;$('eA').value=c.a;$('eC').value=c.c;
+  $('eQ').value=c.q;$('eA').value=c.a;$('eC').value=c.c;$('eT').value=(c.t||[]).join(' ');
   setEditing(true);
   $('eQ').focus();
 }
@@ -337,7 +410,7 @@ function saveEdit(){
   var q=$('eQ').value.trim(),a=$('eA').value.trim();
   if(!q||!a){alert('La pregunta y la respuesta no pueden estar vacías.');return}
   var c=S.cards[S.idx];
-  c.q=q;c.a=a;c.c=$('eC').value.trim();
+  c.q=q;c.a=a;c.c=$('eC').value.trim();c.t=normTags($('eT').value);
   save();renderReview();reveal();refresh();
 }
 function cancelEdit(){setEditing(false)}
@@ -368,9 +441,24 @@ document.addEventListener('keydown',function(e){
 
 /* ---------- lista ---------- */
 function trunc(s,n){return s.length>n?s.slice(0,n-1)+'…':s}
+function visibleItems(){
+  return S.cards.map(function(c,i){return {c:c,i:i}}).filter(function(o){
+    return (S.filter==='all'||o.c.s===S.filter)&&(!S.tagFilter||(o.c.t||[]).indexOf(S.tagFilter)>=0);
+  });
+}
+$('tagFilter').onchange=function(){S.tagFilter=this.value;renderList()};
+$('btnBulk').onclick=function(){
+  var add=normTags($('bulkTag').value),items=visibleItems();
+  if(!add.length){msg('bulkMsg','Escribe una etiqueta primero.','err');return}
+  if(!items.length){msg('bulkMsg','No hay tarjetas visibles con este filtro.','err');return}
+  items.forEach(function(o){o.c.t=normTags((o.c.t||[]).concat(add).join(' '))});
+  save();$('bulkTag').value='';
+  msg('bulkMsg','Etiqueta añadida a '+items.length+' tarjetas.','ok');
+  refreshTagLists();renderList();
+};
 function renderList(){
   var box=$('listBox');box.textContent='';
-  var items=S.cards.map(function(c,i){return {c:c,i:i}}).filter(function(o){return S.filter==='all'||o.c.s===S.filter});
+  var items=visibleItems();
   if(!items.length){var e=document.createElement('div');e.className='empty';e.textContent=S.cards.length?'No hay tarjetas en este filtro.':'Aún no hay tarjetas.';box.appendChild(e);return}
   items.forEach(function(o){
     var d=document.createElement('div');d.className='item';
@@ -378,6 +466,11 @@ function renderList(){
     var b=document.createElement('b');b.textContent=trunc(o.c.q,140);
     var sp=document.createElement('span');sp.textContent=trunc(o.c.a,140);
     t.appendChild(b);t.appendChild(sp);
+    if((o.c.t||[]).length){
+      var tg=document.createElement('div');tg.className='tagrow';tg.style.marginTop='4px';
+      o.c.t.forEach(function(x){var ch=document.createElement('span');ch.className='chip ro';ch.textContent=x;tg.appendChild(ch)});
+      t.appendChild(tg);
+    }
     var sw=document.createElement('div');sw.className='sw';
     [['drop','✕','Descartar'],['keep','✓','Quedarme']].forEach(function(x){
       var bt=document.createElement('button');
@@ -412,22 +505,23 @@ function selected(){
   });
 }
 function buildTSV(){
-  var list=selected(),comp=$('optComp').checked,merge=$('optMerge').checked,tag=$('optTag').value.trim().replace(/\s+/g,'_');
+  var list=selected(),comp=$('optComp').checked,merge=$('optMerge').checked,glob=normTags($('optTag').value);
+  var fields=(merge||!comp)?2:3;
+  var rows=list.map(function(c){return {c:c,tags:normTags(glob.concat(c.t||[]).join(' '))}});
+  var anyTag=rows.some(function(r){return r.tags.length});
   var lines=[];
   if($('optHeader').checked){
     lines.push('#separator:tab','#html:true');
-    var cols=3-0;
-    if(!merge&&comp)cols=3;else cols=2;
-    if(tag)lines.push('#tags column:'+(cols+1));
+    if(anyTag)lines.push('#tags column:'+(fields+1));
   }
-  list.forEach(function(c){
-    var row=[clean(c.q)];
+  rows.forEach(function(r){
+    var c=r.c,row=[clean(c.q)];
     if(merge&&c.c){row.push(clean(c.a)+'<br><br><i>'+clean(c.c)+'</i>')}
     else{row.push(clean(c.a));if(comp&&!merge)row.push(clean(c.c))}
-    if(tag)row.push(tag);
+    if(anyTag)row.push(r.tags.join(' '));
     lines.push(row.join('\t'));
   });
-  return {text:lines.join('\n'),n:list.length};
+  return {text:lines.join('\n'),n:list.length,tagged:anyTag};
 }
 function renderExport(){
   var c=counts(),r=buildTSV();
