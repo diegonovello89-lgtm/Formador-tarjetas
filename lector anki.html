@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lector Anki</title>
+<style>
+:root{
+  --bg:#eef1f3;--panel:#fff;--ink:#1c2530;--mute:#667382;--line:#d6dce1;
+  --keep:#0f7b6c;--keep-bg:#dff1ee;--drop:#b4443a;--drop-bg:#f7e3e0;--acc:#27465f;--hl:#f2c94c;
+  --serif:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#14191f;--panel:#1d242c;--ink:#e6ebef;--mute:#93a0ad;--line:#2f3943;
+  --keep:#4cc3ae;--keep-bg:#183a35;--drop:#ef8a7f;--drop-bg:#40221f;--acc:#8fb4d1;
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans);min-height:100vh}
+.wrap{max-width:760px;margin:0 auto;padding:16px 16px 80px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font:600 20px var(--serif);margin:0}
+nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:16px}
+nav button{flex:1;border:0;background:none;color:var(--mute);padding:9px 6px;border-radius:7px;font:inherit;font-size:14px;cursor:pointer}
+nav button[aria-selected=true]{background:var(--acc);color:var(--bg);font-weight:600}
+nav .n{opacity:.8;font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.panel+.panel{margin-top:14px}
+h2{font:600 16px var(--sans);margin:0 0 4px}
+p.hint{color:var(--mute);font-size:14px;margin:0 0 12px}
+textarea{width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:10px;font:13px/1.45 ui-monospace,Consolas,monospace}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button.b,label.b{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 14px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer}
+button.b:hover,label.b:hover{border-color:var(--acc)}
+.b.pri{background:var(--acc);border-color:var(--acc);color:var(--bg);font-weight:600}
+.b.keep{background:var(--keep);border-color:var(--keep);color:var(--bg);font-weight:600}
+.b.drop{background:var(--drop);border-color:var(--drop);color:var(--bg);font-weight:600}
+.b:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:3px solid var(--hl);outline-offset:2px}
+.drop-zone{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--mute);font-size:14px;margin-top:10px}
+.drop-zone.over{border-color:var(--acc);background:var(--bg)}
+.msg{margin-top:10px;font-size:14px;color:var(--mute)}
+.msg.err{color:var(--drop)}.msg.ok{color:var(--keep)}
+input[type=file]{display:none}
+/* revisión */
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:6px}
+.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .2s}
+.meta{display:flex;justify-content:space-between;font-size:13px;color:var(--mute);margin-bottom:12px;font-variant-numeric:tabular-nums}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 22px;min-height:240px;cursor:pointer;border-left-width:6px}
+.card.keep{border-left-color:var(--keep)}.card.drop{border-left-color:var(--drop)}
+.q{font:500 22px/1.4 var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
+.a{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font:18px/1.5 var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
+.c{margin-top:14px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:15px;color:var(--mute);white-space:pre-wrap;overflow-wrap:anywhere}
+.tap{color:var(--mute);font-size:14px;margin-top:22px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.actions .b{justify-content:center;padding:14px}
+.sub{display:flex;justify-content:space-between;margin-top:10px}
+kbd{font:12px ui-monospace,monospace;border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--bg)}
+.status{display:inline-block;font-size:12px;border-radius:99px;padding:1px 8px;margin-bottom:10px}
+.status.keep{background:var(--keep-bg);color:var(--keep)}.status.drop{background:var(--drop-bg);color:var(--drop)}.status.new{background:var(--bg);color:var(--mute)}
+/* lista */
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filters button{border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.filters button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:var(--bg)}
+.item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .t{flex:1;min-width:0}
+.item .t b{display:block;font-weight:500;overflow-wrap:anywhere}
+.item .t span{color:var(--mute);font-size:13px;overflow-wrap:anywhere;display:block}
+.item .sw{display:flex;gap:4px}
+.item .sw button{border:1px solid var(--line);background:none;color:var(--mute);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:15px}
+.item .sw button.on.keep{background:var(--keep);border-color:var(--keep);color:var(--bg)}
+.item .sw button.on.drop{background:var(--drop);border-color:var(--drop);color:var(--bg)}
+/* exportar */
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:240px;overflow:auto;font:12px/1.45 ui-monospace,monospace;white-space:pre;margin:10px 0 0}
+.opt{display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0}
+.opt input[type=text]{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:5px 8px;font:inherit;font-size:14px}
+.empty{text-align:center;color:var(--mute);padding:30px 10px}
+.hide{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:480px){.q{font-size:20px}.card{padding:20px 16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>Lector Anki</h1><button class="b" id="btnReset">Borrar todo</button></header>
+
+<nav role="tablist">
+  <button role="tab" data-tab="load" aria-selected="true">Cargar</button>
+  <button role="tab" data-tab="review" aria-selected="false">Revisar <span class="n" id="nRev"></span></button>
+  <button role="tab" data-tab="list" aria-selected="false">Lista</button>
+  <button role="tab" data-tab="export" aria-selected="false">Exportar <span class="n" id="nKeep"></span></button>
+</nav>
+
+<!-- CARGAR -->
+<section id="tab-load">
+  <div class="panel">
+    <h2>Pegar tarjetas</h2>
+    <p class="hint">Una tarjeta por línea: pregunta, respuesta y complemento separados por tabulador (TSV). El complemento es opcional.</p>
+    <textarea id="paste" placeholder="¿Pregunta?&#9;Respuesta&#9;Complemento" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="b pri" id="btnClip">Pegar del portapapeles</button>
+      <button class="b" id="btnLoadText">Cargar texto</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Abrir archivo TSV</h2>
+    <p class="hint">Acepta .tsv, .txt o .csv con tabuladores. También puedes arrastrarlo aquí.</p>
+    <div class="drop-zone" id="dz">Suelta el archivo aquí
+      <div class="row" style="justify-content:center"><label class="b" for="file">Elegir archivo</label></div>
+    </div>
+    <input type="file" id="file" accept=".tsv,.txt,.csv,text/tab-separated-values,text/plain">
+    <div class="row">
+      <label class="opt" style="margin:0"><input type="checkbox" id="optAppend"> Añadir a las tarjetas actuales (en vez de reemplazarlas)</label>
+    </div>
+    <div class="msg" id="loadMsg"></div>
+  </div>
+</section>
+
+<!-- REVISAR -->
+<section id="tab-review" class="hide">
+  <div id="revEmpty" class="panel empty">Aún no hay tarjetas. Ve a <b>Cargar</b>.</div>
+  <div id="revBox" class="hide">
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="meta"><span id="metaPos"></span><span id="metaCount"></span></div>
+    <div class="card" id="card" tabindex="0" aria-live="polite">
+      <span class="status new" id="cardStatus"></span>
+      <div class="q" id="cQ"></div>
+      <div id="cBack" class="hide">
+        <div class="a" id="cA"></div>
+        <div class="c hide" id="cC"></div>
+      </div>
+      <div class="tap" id="cTap">Toca la tarjeta o pulsa Espacio para ver la respuesta</div>
+    </div>
+    <div class="actions">
+      <button class="b drop" id="btnDrop">✕ No la quiero</button>
+      <button class="b keep" id="btnKeep">✓ Me la quedo</button>
+    </div>
+    <div class="sub">
+      <button class="b" id="btnPrev">← Anterior</button>
+      <button class="b" id="btnSkip">Saltar →</button>
+    </div>
+    <p class="hint" style="margin-top:14px;text-align:center">
+      <kbd>Espacio</kbd> mostrar · <kbd>→</kbd>/<kbd>K</kbd> me la quedo · <kbd>←</kbd>/<kbd>D</kbd> no la quiero · <kbd>S</kbd> saltar · <kbd>Z</kbd> anterior
+    </p>
+  </div>
+  <div id="revDone" class="panel empty hide">
+    <h2>Revisaste todas las tarjetas</h2>
+    <p class="hint" id="doneSummary"></p>
+    <div class="row" style="justify-content:center">
+      <button class="b" id="btnRestart">Volver al inicio</button>
+      <button class="b pri" id="btnGoExport">Ir a exportar</button>
+    </div>
+  </div>
+</section>
+
+<!-- LISTA -->
+<section id="tab-list" class="hide">
+  <div class="panel">
+    <div class="filters" id="filters">
+      <button data-f="all" aria-pressed="true">Todas</button>
+      <button data-f="new" aria-pressed="false">Sin clasificar</button>
+      <button data-f="keep" aria-pressed="false">Me las quedo</button>
+      <button data-f="drop" aria-pressed="false">Descartadas</button>
+    </div>
+    <div id="listBox"></div>
+  </div>
+</section>
+
+<!-- EXPORTAR -->
+<section id="tab-export" class="hide">
+  <div class="panel">
+    <h2>Exportar a Anki</h2>
+    <p class="hint" id="expSummary"></p>
+    <div class="opt"><label><input type="radio" name="which" value="keep" checked> Solo las que me quedo</label></div>
+    <div class="opt"><label><input type="radio" name="which" value="keepnew"> Las que me quedo + sin clasificar</label></div>
+    <div class="opt"><label><input type="radio" name="which" value="drop"> Solo las descartadas</label></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    <div class="opt"><label><input type="checkbox" id="optComp" checked> Incluir complemento (3.ª columna)</label></div>
+    <div class="opt"><label><input type="checkbox" id="optMerge"> Unir complemento dentro de la respuesta</label></div>
+    <div class="opt"><label><input type="checkbox" id="optHeader" checked> Incluir encabezados de Anki (<code>#separator:tab</code>, <code>#html:true</code>)</label></div>
+    <div class="opt">Etiqueta: <input type="text" id="optTag" placeholder="opcional, ej. cardiologia"></div>
+    <div class="row">
+      <button class="b pri" id="btnDownload">Descargar .tsv</button>
+      <button class="b" id="btnCopy">Copiar al portapapeles</button>
+    </div>
+    <div class="msg" id="expMsg"></div>
+    <pre id="preview"></pre>
+    <p class="hint" style="margin-top:12px">En Anki: Archivo → Importar → elige el .tsv. Asigna columna 1 a Anverso, 2 a Reverso y 3 a un campo extra (o a Reverso si usas «Unir»).</p>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+'use strict';
+var KEY='lector_anki_v1';
+var S={cards:[],idx:0,filter:'all'};   // card: {q,a,c,s:'new'|'keep'|'drop'}
+var $=function(id){return document.getElementById(id)};
+var shown=false;
+
+/* ---------- persistencia ---------- */
+function save(){try{localStorage.setItem(KEY,JSON.stringify({cards:S.cards,idx:S.idx}))}catch(e){}}
+function restore(){
+  try{var d=JSON.parse(localStorage.getItem(KEY)||'null');
+    if(d&&Array.isArray(d.cards)){S.cards=d.cards;S.idx=Math.min(d.idx||0,Math.max(0,d.cards.length-1))}}catch(e){}
+}
+
+/* ---------- parseo ---------- */
+function unq(s){
+  s=s.trim();
+  if(s.length>1&&s[0]==='"'&&s[s.length-1]==='"')s=s.slice(1,-1).replace(/""/g,'"');
+  return s;
+}
+function fromHtmlBreaks(s){return s.replace(/<br\s*\/?>/gi,'\n')}
+function parse(text){
+  var out=[],skipped=0;
+  text.replace(/\r\n?/g,'\n').split('\n').forEach(function(line){
+    if(!line.trim()||line.charAt(0)==='#')return;
+    var p=line.split('\t').map(unq);
+    if(p.length<2||!p[0]||!p[1]){skipped++;return}
+    out.push({q:fromHtmlBreaks(p[0]),a:fromHtmlBreaks(p[1]),c:fromHtmlBreaks(p.slice(2).join(' ').trim()),s:'new'});
+  });
+  return {cards:out,skipped:skipped};
+}
+function load(text){
+  var r=parse(text),m=$('loadMsg');
+  if(!r.cards.length){
+    m.className='msg err';
+    m.textContent='No encontré tarjetas. Cada línea necesita al menos pregunta y respuesta separadas por un tabulador.';
+    return;
+  }
+  if($('optAppend').checked&&S.cards.length){S.cards=S.cards.concat(r.cards)}
+  else{S.cards=r.cards;S.idx=0}
+  save();
+  m.className='msg ok';
+  m.textContent='Se cargaron '+r.cards.length+' tarjetas'+(r.skipped?' ('+r.skipped+' líneas omitidas por estar incompletas)':'')+'.';
+  refresh();
+  setTimeout(function(){tab('review')},500);
+}
+
+/* ---------- pestañas ---------- */
+function tab(name){
+  ['load','review','list','export'].forEach(function(t){
+    $('tab-'+t).classList.toggle('hide',t!==name);
+  });
+  document.querySelectorAll('nav button').forEach(function(b){
+    b.setAttribute('aria-selected',b.dataset.tab===name?'true':'false');
+  });
+  if(name==='review')renderReview();
+  if(name==='list')renderList();
+  if(name==='export')renderExport();
+  S.tab=name;
+}
+document.querySelectorAll('nav button').forEach(function(b){b.onclick=function(){tab(b.dataset.tab)}});
+
+function counts(){
+  var c={new:0,keep:0,drop:0};
+  S.cards.forEach(function(x){c[x.s]++});return c;
+}
+function refresh(){
+  var c=counts();
+  $('nRev').textContent=S.cards.length?'('+c.new+')':'';
+  $('nKeep').textContent=c.keep?'('+c.keep+')':'';
+  if(S.tab==='review')renderReview();
+  if(S.tab==='list')renderList();
+  if(S.tab==='export')renderExport();
+}
+
+/* ---------- revisión ---------- */
+function renderReview(){
+  var n=S.cards.length;
+  $('revEmpty').classList.toggle('hide',n>0);
+  var done=n>0&&S.idx>=n;
+  $('revBox').classList.toggle('hide',n===0||done);
+  $('revDone').classList.toggle('hide',!done);
+  if(!n||done){
+    if(done){var c=counts();$('doneSummary').textContent=c.keep+' tarjetas para quedarte, '+c.drop+' descartadas'+(c.new?' y '+c.new+' sin clasificar (usa «Lista» para verlas)':'')+'.'}
+    $('barFill').style.width=done?'100%':'0';return;
+  }
+  var card=S.cards[S.idx],c2=counts();
+  shown=false;
+  $('cQ').textContent=card.q;
+  $('cA').textContent=card.a;
+  $('cC').textContent=card.c;
+  $('cC').classList.toggle('hide',!card.c);
+  $('cBack').classList.add('hide');
+  $('cTap').classList.remove('hide');
+  var st=$('cardStatus');
+  st.className='status '+card.s;
+  st.textContent=card.s==='keep'?'Te la quedas':card.s==='drop'?'Descartada':'Sin clasificar';
+  $('card').className='card'+(card.s==='new'?'':' '+card.s);
+  $('metaPos').textContent='Tarjeta '+(S.idx+1)+' de '+n;
+  $('metaCount').textContent='✓ '+c2.keep+'   ✕ '+c2.drop+'   · '+c2.new+' pendientes';
+  $('barFill').style.width=((c2.keep+c2.drop)/n*100)+'%';
+  $('btnPrev').disabled=S.idx===0;
+}
+function reveal(){
+  if(shown)return;shown=true;
+  $('cBack').classList.remove('hide');$('cTap').classList.add('hide');
+}
+function mark(s){
+  if(S.cards.length===0||S.idx>=S.cards.length)return;
+  S.cards[S.idx].s=s;S.idx++;save();refresh();
+}
+function skip(){if(S.idx<S.cards.length){S.idx++;save();refresh()}}
+function prev(){if(S.idx>0){S.idx--;save();refresh()}}
+$('card').onclick=reveal;
+$('btnKeep').onclick=function(){mark('keep')};
+$('btnDrop').onclick=function(){mark('drop')};
+$('btnSkip').onclick=skip;
+$('btnPrev').onclick=prev;
+$('btnRestart').onclick=function(){S.idx=0;save();refresh()};
+$('btnGoExport').onclick=function(){tab('export')};
+document.addEventListener('keydown',function(e){
+  if(S.tab!=='review'||e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.ctrlKey||e.metaKey)return;
+  var k=e.key.toLowerCase();
+  if(k===' '){e.preventDefault();reveal()}
+  else if(k==='arrowright'||k==='k')mark('keep');
+  else if(k==='arrowleft'||k==='d')mark('drop');
+  else if(k==='s')skip();
+  else if(k==='z')prev();
+});
+
+/* ---------- lista ---------- */
+function trunc(s,n){return s.length>n?s.slice(0,n-1)+'…':s}
+function renderList(){
+  var box=$('listBox');box.textContent='';
+  var items=S.cards.map(function(c,i){return {c:c,i:i}}).filter(function(o){return S.filter==='all'||o.c.s===S.filter});
+  if(!items.length){var e=document.createElement('div');e.className='empty';e.textContent=S.cards.length?'No hay tarjetas en este filtro.':'Aún no hay tarjetas.';box.appendChild(e);return}
+  items.forEach(function(o){
+    var d=document.createElement('div');d.className='item';
+    var t=document.createElement('div');t.className='t';
+    var b=document.createElement('b');b.textContent=trunc(o.c.q,140);
+    var sp=document.createElement('span');sp.textContent=trunc(o.c.a,140);
+    t.appendChild(b);t.appendChild(sp);
+    var sw=document.createElement('div');sw.className='sw';
+    [['drop','✕','Descartar'],['keep','✓','Quedarme']].forEach(function(x){
+      var bt=document.createElement('button');
+      bt.textContent=x[1];bt.title=x[2];bt.setAttribute('aria-label',x[2]);
+      bt.className=(o.c.s===x[0]?'on ':'')+x[0];
+      bt.onclick=function(){o.c.s=(o.c.s===x[0])?'new':x[0];save();refresh()};
+      sw.appendChild(bt);
+    });
+    var go=document.createElement('button');go.textContent='👁';go.title='Ver en revisión';go.setAttribute('aria-label','Ver en revisión');
+    go.onclick=function(){S.idx=o.i;save();tab('review')};
+    sw.appendChild(go);
+    d.appendChild(t);d.appendChild(sw);box.appendChild(d);
+  });
+}
+document.querySelectorAll('#filters button').forEach(function(b){
+  b.onclick=function(){
+    S.filter=b.dataset.f;
+    document.querySelectorAll('#filters button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+    renderList();
+  };
+});
+
+/* ---------- exportar ---------- */
+function clean(s){return s.replace(/\t/g,' ').replace(/\r?\n/g,'<br>').trim()}
+function selected(){
+  var w=document.querySelector('input[name=which]:checked').value;
+  return S.cards.filter(function(c){
+    return w==='keep'?c.s==='keep':w==='drop'?c.s==='drop':(c.s==='keep'||c.s==='new');
+  });
+}
+function buildTSV(){
+  var list=selected(),comp=$('optComp').checked,merge=$('optMerge').checked,tag=$('optTag').value.trim().replace(/\s+/g,'_');
+  var lines=[];
+  if($('optHeader').checked){
+    lines.push('#separator:tab','#html:true');
+    var cols=3-0;
+    if(!merge&&comp)cols=3;else cols=2;
+    if(tag)lines.push('#tags column:'+(cols+1));
+  }
+  list.forEach(function(c){
+    var row=[clean(c.q)];
+    if(merge&&c.c){row.push(clean(c.a)+'<br><br><i>'+clean(c.c)+'</i>')}
+    else{row.push(clean(c.a));if(comp&&!merge)row.push(clean(c.c))}
+    if(tag)row.push(tag);
+    lines.push(row.join('\t'));
+  });
+  return {text:lines.join('\n'),n:list.length};
+}
+function renderExport(){
+  var c=counts(),r=buildTSV();
+  $('expSummary').textContent=c.keep+' tarjetas para quedarte · '+c.drop+' descartadas · '+c.new+' sin clasificar. Se exportarán '+r.n+'.';
+  $('preview').textContent=r.n?r.text.split('\n').slice(0,12).join('\n')+(r.text.split('\n').length>12?'\n…':''):'No hay tarjetas que exportar con esta selección.';
+  $('btnDownload').disabled=$('btnCopy').disabled=!r.n;
+}
+document.querySelectorAll('#tab-export input').forEach(function(i){i.oninput=renderExport;i.onchange=renderExport});
+$('btnDownload').onclick=function(){
+  var r=buildTSV();if(!r.n)return;
+  var blob=new Blob([r.text+'\n'],{type:'text/tab-separated-values;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='anki_'+new Date().toISOString().slice(0,10)+'.tsv';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(a.href)},2000);
+  msg('expMsg','Descargado: '+r.n+' tarjetas.','ok');
+};
+$('btnCopy').onclick=function(){
+  var r=buildTSV();if(!r.n)return;
+  copyText(r.text).then(function(){msg('expMsg','Copiadas '+r.n+' tarjetas.','ok')},function(){msg('expMsg','No se pudo copiar. Usa «Descargar .tsv».','err')});
+};
+function copyText(t){
+  if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);
+  return new Promise(function(res,rej){
+    var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy')?res():rej()}catch(e){rej(e)}ta.remove();
+  });
+}
+function msg(id,t,cls){var m=$(id);m.className='msg '+(cls||'');m.textContent=t}
+
+/* ---------- cargar ---------- */
+$('btnClip').onclick=function(){
+  if(navigator.clipboard&&navigator.clipboard.readText){
+    navigator.clipboard.readText().then(function(t){
+      if(!t.trim()){msg('loadMsg','El portapapeles está vacío.','err');return}
+      $('paste').value=t;load(t);
+    },function(){msg('loadMsg','El navegador bloqueó el portapapeles. Pega con Ctrl+V en el cuadro y pulsa «Cargar texto».','err')});
+  }else msg('loadMsg','Este navegador no permite leer el portapapeles. Pega con Ctrl+V en el cuadro y pulsa «Cargar texto».','err');
+};
+$('btnLoadText').onclick=function(){load($('paste').value)};
+function readFile(f){
+  if(!f)return;
+  var r=new FileReader();
+  r.onload=function(){load(String(r.result))};
+  r.onerror=function(){msg('loadMsg','No se pudo leer el archivo.','err')};
+  r.readAsText(f,'utf-8');
+}
+$('file').onchange=function(e){readFile(e.target.files[0]);e.target.value=''};
+var dz=$('dz');
+['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.add('over')})});
+['dragleave','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.remove('over')})});
+dz.addEventListener('drop',function(e){readFile(e.dataTransfer.files[0])});
+
+$('btnReset').onclick=function(){
+  if(!S.cards.length||confirm('¿Borrar todas las tarjetas y su clasificación?')){
+    S.cards=[];S.idx=0;try{localStorage.removeItem(KEY)}catch(e){}
+    $('paste').value='';msg('loadMsg','','');refresh();tab('load');
+  }
+};
+
+/* ---------- inicio ---------- */
+restore();S.tab='load';refresh();
+if(S.cards.length)tab('review');
+})();
+</script>
+</body>
+</html>
